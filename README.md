@@ -4,7 +4,6 @@ A multi-agent AI system that generates culturally-localized, multi-language less
 
 Built as an extended project for the **Google Agentic Hackathon**, using [Google ADK](https://google.github.io/adk-docs/) for agent orchestration.
 
-> Merged from two originally separate repos — `agent_f` (frontend) and `agent_b` (backend) — into a single monorepo, with full commit history from both preserved.
 
 ## What it does
 

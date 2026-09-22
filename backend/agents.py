@@ -1,0 +1,250 @@
+from pydantic import BaseModel, Field
+from google.adk.agents import LlmAgent #type:ignore
+from google.adk.tools import google_search #type:ignore
+
+
+# 📦 Expected structured schema from Prompt Parser
+class ParseOutput(BaseModel):
+    topic: str = Field(description="The topic of the Prompt")
+    grade_levels: list[str] | None = Field(description="The grade levels for which the prompt is i.e ([1,2,3,4])")
+    content_types: list[str] = Field(description="The types of content to be generated for the prompt like Story,Worksheet,Fun Activity , Black Board Sketch ,Flashcards and Best out of waste etc.")
+    need_grade: bool
+
+# 1️⃣ Prompt Parser Agent
+prompt_parser = LlmAgent(
+    name="prompt_parser",
+    model="gemini-2.0-flash",
+    instruction="""
+Extract the intended topic, list of grade_levels (if mentioned), and desired content_types from: story, worksheet, diagram, activity, flashcards and best out of waste. 
+If grade is not specified, set need_grade to true.
+Return exactly matching this JSON schema.""",
+    output_schema=ParseOutput,
+    disallow_transfer_to_parent=True, 
+    disallow_transfer_to_peers=True
+)
+
+# 📚 Cultural Search Agent (always used)
+class CultureOutput(BaseModel):
+    cultural_refs: list[str]
+
+culture_agent = LlmAgent(
+    name="culture_agent",
+    model="gemini-2.5-flash",
+    tools=[google_search],
+    instruction="""
+    Your goal is to gather **local or cultural references** relevant to the user's topic. These references may include, but are not limited to:
+        - Local festivals and celebrations
+        - Traditional folk tales and myths
+        - Religious or regional events
+        - Cultural practices or customs
+        - Famous local personalities or authors
+        - Historical events with cultural relevance
+        - Traditional arts, crafts, or cuisine
+        - Local landmarks with cultural significance
+
+        📌 **Instructions:**
+
+        1. Use the `google_search` tool to look up cultural connections related to the topic.
+        2. Extract a minimum of 3 and a maximum of 5 unique cultural references.
+        3. Each reference should be a short phrase or sentence (1–2 lines max).
+        4. Return your answer strictly in this format:
+        {
+        "cultural_refs": [
+            "Example reference 1",
+            "Example reference 2",
+            "Example reference 3"
+        ]
+        }
+        ✅ DO NOT include any explanation, commentary, or additional formatting.
+
+        🚫 DO NOT return plain text, markdown, or bullets—only a valid JSON object with a cultural_refs array.
+
+        🎯 This response will be parsed directly by json.loads()—ensure it is always valid JSON.
+        """,
+    # output_schema=CultureOutput,
+    disallow_transfer_to_parent=True, 
+    disallow_transfer_to_peers=True
+)
+
+# 🧭 Curriculum Mapper Agent (fallback for missing grades)
+class GradeOutput(BaseModel):
+    grade_levels: list[str]
+
+mapper_agent = LlmAgent(
+    name="mapper_agent",
+    model="gemini-2.0-flash",
+    instruction="""
+Given topic and cultural_refs, infer an appropriate list of grade_levels for Indian schools.
+Return JSON: { "grade_levels": [...] }""",
+    output_schema=GradeOutput,
+    disallow_transfer_to_parent=True, 
+    disallow_transfer_to_peers=True
+)
+
+enricher_agent = LlmAgent(
+    name="enricher_agent",
+    model="gemini-2.0-flash",
+    instruction="""
+You are a prompt enricher for educational content generation.
+
+Given a topic, content_type (e.g., worksheet, story, diagram, flashcards, best-out-of-waste), grade_level, and optional cultural_refs — generate a single enriched and scientifically accurate prompt for the **specified content_type only**.
+
+Strictly follow these rules:
+- DO NOT generate prompts for any other content_type.
+- Ensure the prompt is appropriate for the given grade level.
+- If cultural_refs are provided, weave them in meaningfully (unless content_type is 'diagram', in which case cultural refs may be skipped).
+- Keep the prompt concise, clear,contain the cultural references if not a diagram and if relevant to the topic and type of content, and focused on helping the generation model produce quality content.
+- The model does not have image generation capability between texts so keep that in mind when creating a prompt for story , worksheet or any other content.
+- The output will be strictly covered using text.
+
+Do NOT add extra sections or assume multiple content types unless explicitly told.
+Only respond with the enriched prompt for the given content_type.
+""",
+    disallow_transfer_to_parent=True,
+    disallow_transfer_to_peers=True
+)
+
+content_generator_agent = LlmAgent(
+    name="content_generator_agent",
+    model="gemini-2.5-flash",
+    instruction="""
+You are an expert educational content creator. Your task is to generate **only the requested type of educational content** for a specified grade level and topic.
+
+🎯 Your goals:
+- Strictly **generate the exact content type requested** (e.g., quiz, story, worksheet, explanation, activity, flashcards, best-out-of-waste). Do not mix or expand beyond this type.
+- Ensure the tone, vocabulary, and complexity match the **given grade level** (e.g., 2nd grade, 5th grade).
+- Use the topic context to create **original, engaging, and relevant content**. It should be informative but simple enough for the target grade.
+- If local cultural references are given, incorporate them naturally and appropriately.
+- Keep the response clean — no educational analysis, enrichment, or meta commentary.
+
+🚫 DO NOT:
+- Add enrichments, summaries, learning outcomes, fun facts, or extra explanations.
+- Deviate from the requested content type.
+- Include any structural templates, labels, or comments outside the required format.
+
+✅ DO:
+- Focus only on generating the exact content type (no more, no less).
+- Maintain grade-appropriate language and format.
+- Return only the requested content inside the specified JSON structure.
+
+🧾 Return your response in **strict JSON format**:
+{
+    "content": "ACTUAL_CONTENT_HERE"
+}
+""",
+    disallow_transfer_to_parent=True,
+    disallow_transfer_to_peers=True,
+)
+
+class TopicsOutput(BaseModel):
+    topics: list[str] | None = Field(description="The topics for the given grade and subject.")
+
+# 1️⃣ Prompt Parser Agent
+topics_agent = LlmAgent(
+    name="topics_procurer",
+    model="gemini-2.0-flash",
+    instruction="""
+    From the provided grade level and subject generate topics meeting the sophistication of the grade level for that subject.
+    Return exactly matching this json schema.""",
+    output_schema=TopicsOutput,
+    disallow_transfer_to_parent=True, 
+    disallow_transfer_to_peers=True
+)
+
+class TypesOutput(BaseModel):
+    types: list[str] | None = Field(description="The content typs for the given grade ,topic and subject.")
+
+# 1️⃣ Prompt Parser Agent
+ctypa = LlmAgent(
+    name="topics_procurer",
+    model="gemini-2.0-flash",
+    instruction="""
+    From the provided grade level and subject generate content types meeting the sophistication of the grade level for that subject and would make for a good and creative learning experience.
+    The content types can be story,worksheet,diagram and an activity.
+    Return exactly matching this json schema.""",
+    output_schema=TypesOutput,
+    disallow_transfer_to_parent=True, 
+    disallow_transfer_to_peers=True
+)
+
+syllabus_agent = LlmAgent(
+    name="syllabus_agent",
+    model="gemini-2.5-flash",
+    tools=[google_search],
+    instruction="""
+    Your job is to find **syllabus details** relevant to the user's input.
+    
+    The input will include:
+    - Grade level (e.g., Grade 4, Class 6, etc.)
+    - Subject or Topic (e.g., Mathematics, Environment, Fractions)
+    - Educational Board (e.g., CBSE, ICSE, NCERT, Maharashtra Board)
+
+    🎯 Goal:
+    - Use the `google_search` tool to find the latest and accurate syllabus information.
+    - Extract **3 to 5 distinct syllabus points**—these could be chapter names, learning objectives, or key topics covered under the given subject and grade.
+
+    📝 Example references:
+        - "Understanding Fractions – Identification and Comparison"
+        - "Measurement of Length, Weight and Capacity"
+        - "NCERT Class 4 Maths Chapter: Play with Patterns"
+
+    ✅ Return your result strictly in this format:
+    {
+        "syllabus_points": [
+            "Syllabus point 1",
+            "Syllabus point 2",
+            "Syllabus point 3"
+        ]
+    }
+
+    🚫 Do not include commentary, markdown, or text outside the JSON structure.
+    🚫 Do not return plain text—only return a **valid JSON object** that can be parsed by `json.loads()`.
+    """,
+    disallow_transfer_to_parent=True,
+    disallow_transfer_to_peers=True
+)
+
+class VisualStorySegment(BaseModel):
+    narration: list[str] = Field(..., description="The background narration text for this segment.")
+    image_prompt: list[str] = Field(..., description="A descriptive prompt for an image generation model, tailored to this segment.")
+
+
+story_breaker_agent = LlmAgent(
+    name="story_breaker_agent",
+    model="gemini-2.5-flash",
+    output_schema=VisualStorySegment, # <--- Changed here to expect a list
+    instruction="""
+    Your primary goal is to transform a given raw story text into a structured visual story, broken down into multiple synchronized segments.
+
+    The input will include:
+    - `story_text`: The complete story, which might contain HTML tags. You must ignore these tags and process only the plain text.
+    - `topic`: The general topic of the story.
+    - `grade_level`: The target grade for the story, influencing complexity and style.
+    - `selected_language`: The language in which the narration should be generated.
+
+    🎯 Goal:
+    - Read the `story_text` and identify natural breaks or key scenes that would make compelling visual segments.
+    - For each significant scene or narrative chunk, create a distinct segment containing:
+        1.  A concise `narration` string (a few sentences or a short paragraph) that accurately summarizes or describes that part of the story, serving as the voice-over or accompanying text for a visual.
+        2.  A detailed `image_prompt` string that describes a specific visual representation of that `narration` segment. This prompt should be highly descriptive and suitable for a text-to-image generation model.
+    - Ensure that the `narration` and `image_prompt` for each segment are perfectly synchronized and maintain the chronological flow and meaning of the original story.
+    - The `image_prompt` for each segment should explicitly mention the `topic`, `grade_level` (e.g., "children's book style for Grade 5"), and integrate `selected_language` cultural or stylistic elements where appropriate to enhance relevance.
+
+    📝 Example of expected output (an array of segments):
+    [
+        "narration": ["Once upon a time, a brave little rabbit named Rusty decided to embark on a grand adventure.","He met a wise old owl who showed him a secret path through the whispering woods.",]
+        "image_prompt": "A cute, brave cartoon rabbit wearing a tiny backpack, standing at the edge of a lush, vibrant forest at dawn, full of wonder. Children's book style for Grade 2 story in English."
+    ]
+
+    ⚠️ Important:
+    - If the `story_text` is very short and cannot logically be broken into multiple distinct segments, generate just one `VisualStorySegment` object within the array that captures the essence of the entire story.
+    - **Crucially**, your output must be a **valid JSON array of objects**, where each object strictly conforms to the `VisualStorySegment` schema.
+
+    ✅ Return your result strictly as a valid JSON array of `VisualStorySegment` objects.
+    🚫 Do not include commentary, markdown outside the JSON array, or any additional text.
+    🚫 Do not return plain text—only return a **valid JSON array of objects**.
+    🚫 Do not return different numbers of narration and image_prompts both should be always equal.
+    """,
+    disallow_transfer_to_parent=True,
+    disallow_transfer_to_peers=True
+)

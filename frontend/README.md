@@ -1,70 +1,64 @@
-# Getting Started with Create React App
+# Paathshala — Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+React frontend for Paathshala, a multi-agent lesson-content generator for teachers. Handles the search/voice interface, content display, weekly lesson planner, and PDF/image export.
 
-## Available Scripts
+See the [root README](../README.md) for the full system overview (backend, agent pipeline, architecture).
 
-In the project directory, you can run:
+## Features
 
-### `npm start`
+- **Voice & text search** — describe what content you need by typing or speaking, in one of 12 supported languages/dialects (English, Hindi, Marathi, Bengali, Gujarati, Kannada, Malayalam, Punjabi, Tamil, Telugu, Urdu)
+- **Content viewer** — displays generated stories, worksheets, diagrams, flashcards, and activities per grade/type
+- **Interactive visual stories** — turns a generated story into a segmented, narrated visual sequence
+- **Weekly planner** — schedule generated lessons across the week
+- **PDF & image export** — download generated content as a print-ready PDF or image
+- **Offline-capable caching** — saved content and weekly plans persist locally via IndexedDB, so previously generated material is available without a network round-trip
+- **Google OAuth session handling**
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Tech stack
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- React 19 + React Router
+- `idb` — IndexedDB wrapper for local caching
+- `react-speech-recognition` — voice input
+- `jsPDF` + `html2canvas` — PDF/image export
+- Framer Motion — animation
+- Mermaid — diagram rendering
+- Lucide — icons
 
-### `npm test`
+## Project structure
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+```
+src/
+  App.js                      # Routing, auth check, theme state
+  components/
+    SearchHome.js               # Voice/text search input, language selector
+    ContentGenerator.js           # Content display, PDF/image export, visual story trigger
+    WeeklyPlanner.js                # Lesson scheduling UI
+    Resources.js                     # Saved content library view
+    LandingPage.js                    # Landing/marketing page
+    Navbar.js                          # App navigation
+    RotatingText.js                     # Rotating language-name animation on landing page
+    storage.js                           # IndexedDB schema & CRUD (saved content + weekly plans)
+public/                                    # Static assets, manifest
+apphosting.yaml                              # Firebase App Hosting config
+```
 
-### `npm run build`
+## Setup
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+```bash
+npm install
+npm start
+```
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+Runs at `http://localhost:3000` by default and expects the backend running at `http://localhost:8000` (update the API base URL in the source if your backend runs elsewhere).
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+## Build
 
-### `npm run eject`
+```bash
+npm run build
+```
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Outputs a production build to `build/` — this folder is generated and shouldn't be committed (see root `.gitignore`).
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## Status
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
-
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
-
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Voice input relies on the Web Speech API via `react-speech-recognition`, which has inconsistent browser support (works best in Chrome-based browsers). API base URLs are currently hardcoded to `localhost` in a few places and should be moved to an environment variable before deploying to a non-local backend.
